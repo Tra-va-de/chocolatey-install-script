@@ -89,37 +89,91 @@ function Restore-VoicemeeterSettings {
     Write-Host "Voicemeeter settings restore completed."
 }
 
+# Function for Discord fix
+function Fix-Discord {
+    # Get the Local AppData path dynamically using %LocalAppData% environment variable
+    $localAppData = [System.Environment]::GetFolderPath('LocalApplicationData')
+    $discordPath = Join-Path $localAppData "Discord"
+
+    # Navigate to the Discord folder
+    Set-Location -Path $discordPath
+
+    # Delete the installer.db file if it exists
+    $installerDbPath = Join-Path $discordPath "installer.db"
+    if (Test-Path $installerDbPath) {
+        Remove-Item $installerDbPath -Force
+        Write-Host "Deleted installer.db file from $discordPath"
+    }
+    else {
+        Write-Host "No installer.db file found to delete."
+    }
+
+    # Get the folder that starts with "app-"
+    $appVersionFolder = Get-ChildItem -Path $discordPath | Where-Object { $_.Name -like 'app-*' } | Select-Object -First 1
+
+    # Check if the app version folder was found
+    if ($appVersionFolder -ne $null) {
+        $sourceDbPath = Join-Path $appVersionFolder.FullName "installer.db"
+
+        # Check if the installer.db file exists in the app version folder
+        if (Test-Path $sourceDbPath) {
+            # Copy the installer.db file to the Discord folder
+            Copy-Item -Path $sourceDbPath -Destination $discordPath -Force
+            Write-Host "Copied installer.db from $($appVersionFolder.Name) to $discordPath"
+        }
+        else {
+            Write-Host "No installer.db file found in $($appVersionFolder.Name)"
+        }
+    }
+    else {
+        Write-Host "No app version folder found."
+    }
+}
+
 # Asking for confirmation to install all packages
 $packagesConfirmation = Read-Host -Prompt "`nDo you want to install these packages? [Y]es or [N]o"
 
-if ($packagesConfirmation -eq 'Y' -or $packagesConfirmation -eq '') {  # Default to Yes on Enter
+if ($packagesConfirmation -eq 'Y' -or $packagesConfirmation -eq '') {
+    # Default to Yes on Enter
     foreach ($package in $packages) {
         choco install -y $package
         Write-Host "$package has been installed."
     }
 
+    # Check if the Discord package is available
+    $hasDiscord = $packages -contains 'discord'
+
+    if ($hasDiscord) {
+        Fix-Discord  # Use fix function
+        Write-Host "Discord Fix applied."   
+    }
+
     # Check if the Voicemeeter package is available
-    $hasVoicemeeterPotato = Get-Package | Where-Object { $_.Id -eq 'voicemeeter-potato' }
+    $hasVoicemeeterPotato = $packages -contains 'voicemeeter-potato'
 
     if ($hasVoicemeeterPotato) {
         Restore-VoicemeeterSettings  # Restore settings if voicemeeter-potato is present
 
         # Check if the RunAsDate package is available
-        $hasRunAsDate = Get-Package | Where-Object { $_.Id -eq 'runasdate' }
+        $hasRunAsDate = $packages -contains 'runasdate'
+
         if ($hasRunAsDate) {
             Create-VoicemeeterShortcut  # Create shortcut if both voicemeeter-potato and runasdate are present
         }
     }
-} else {
+}
+else {
     Write-Host "Installation of packages skipped."
 }
 
 # Asking for confirmation to install all packages
 $licenseConfirmation = Read-Host -Prompt "`nDo you want to activate Windows? [Y]es or [N]o"
 
-if ($licenseConfirmation -eq 'Y' -or $licenseConfirmation -eq '') {  # Default to Yes on Enter
+if ($licenseConfirmation -eq 'Y' -or $licenseConfirmation -eq '') {
+    # Default to Yes on Enter
     irm https://get.activated.win | iex
-} else {
+}
+else {
     Write-Host "Windows activation has been skipped."
 }
 
