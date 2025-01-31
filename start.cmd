@@ -1,1 +1,2 @@
-powershell -Command "Start-Process powershell -ArgumentList '-ExecutionPolicy Bypass -File \".\psScript.ps1\"' -Verb RunAs"
+start powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\psScript.ps1
+exit
